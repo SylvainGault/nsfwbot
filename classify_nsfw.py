@@ -6,20 +6,33 @@ import caffe
 
 
 
-def eval_nsfw(model, transformer, filename):
-    img = caffe.io.load_image(filename)
+def eval_nsfw(model, transformer, filenames):
+    imgs = []
+    retfilenames = []
+    for filename in filenames:
+        try:
+            img = caffe.io.load_image(filename)
+        except:
+            continue
 
-    # Use only the first frame of a gif
-    if img.ndim == 4:
-        img = img[0, :, :, :]
+        # Use only the first frame of a gif
+        if img.ndim == 4:
+            img = img[0, :, :, :]
 
-    img = transformer.preprocess('data', img)
-    img = img.reshape((1,) + img.shape)
+        try:
+            img = transformer.preprocess('data', img)
+        except:
+            continue
+
+        retfilenames.append(filename)
+        imgs.append(img)
+
+    imgs = np.array(imgs)
 
     output_name = next(reversed(model.blobs))
     input_name = model.inputs[0]
-    all_outputs = model.forward_all(blobs=[output_name], **{input_name: img})
-    return all_outputs[output_name][0, 1]
+    all_outputs = model.forward_all(blobs=[output_name], **{input_name: imgs})
+    return retfilenames, all_outputs[output_name][:, 1]
 
 
 
@@ -36,21 +49,12 @@ def main():
     transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
     transformer.set_mean('data', np.array([104, 117, 123]))  # subtract the dataset-mean value in each channel
 
-    s = 0
-    n = 0
-    for f in filenames:
-        try:
-            score = eval_nsfw(nsfw_model, transformer, f)
-        except:
-            print("%s: N/A" % f)
-            continue
+    names, scores = eval_nsfw(nsfw_model, transformer, filenames)
+    for f, s in zip(names, scores):
+        print("%s: %f" % (f, s))
 
-        s += score
-        n += 1
-        print("%s: %f" % (f, score))
-
-    if n > 0:
-        print("Average:", s / n)
+    if len(names) > 0:
+        print("Average:", scores.mean())
 
 
 
