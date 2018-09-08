@@ -8,6 +8,11 @@ import caffe
 
 def eval_nsfw(model, transformer, filename):
     img = caffe.io.load_image(filename)
+
+    # Use only the first frame of a gif
+    if img.ndim == 4:
+        img = img[0, :, :, :]
+
     img = transformer.preprocess('data', img)
     img = img.reshape((1,) + img.shape)
 
