@@ -35,12 +35,20 @@ def main():
     transformer.set_mean('data', np.array([104, 117, 123]))  # subtract the dataset-mean value in each channel
 
     s = 0
+    n = 0
     for f in filenames:
-        score = eval_nsfw(nsfw_model, transformer, f)
+        try:
+            score = eval_nsfw(nsfw_model, transformer, f)
+        except:
+            print("%s: N/A" % f)
+            continue
+
         s += score
+        n += 1
         print("%s: %f" % (f, score))
 
-    print("Average:", s / len(filenames))
+    if n > 0:
+        print("Average:", s / n)
 
 
 
