@@ -37,9 +37,13 @@ def main():
     transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
     transformer.set_mean('data', np.array([104, 117, 123]))  # subtract the dataset-mean value in each channel
 
+    s = 0
     for f in filenames:
         score = eval_nsfw(nsfw_model, transformer, f)
+        s += score
         print("%s: %f" % (f, score))
+
+    print("Average:", s / len(filenames))
 
 
 
