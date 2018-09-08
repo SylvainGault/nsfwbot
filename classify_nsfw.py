@@ -8,12 +8,9 @@ import caffe
 
 def eval_nsfw(model, transformer, filename):
     img = caffe.io.load_image(filename)
-    img = caffe.io.resize_image(img, (256, 256, 3), 3)
-    w, h = img.shape[:2]
     inh, inw = model.blobs['data'].data.shape[-2:]
-    offset_x = max(w - inw, 0) // 2
-    offset_y = max(h - inh, 0) // 2
-    img = img[offset_y:offset_y+inh, offset_x:offset_x+inw]
+
+    img = caffe.io.resize_image(img, (inh, inw, 3), 3)
     img = transformer.preprocess('data', img)
     img = img.reshape((1,) + img.shape)
 
