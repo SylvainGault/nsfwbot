@@ -22,17 +22,20 @@ def eval_nsfw(model, transformer, filenames):
 
         retfilenames.append(filename)
 
-        # Use only the first frame of a gif
+        # Use one tenth of the frames for gifs
         if img.ndim == 4:
-            img = img[0, :, :, :]
+            newimgs = img[::10, :, :, :]
+        else:
+            newimgs = np.expand_dims(img, axis=0)
 
-        try:
-            img = transformer.preprocess('data', img)
-        except:
-            continue
+        for img in newimgs:
+            try:
+                img = transformer.preprocess('data', img)
+            except:
+                continue
 
-        imgs.append(img)
-        residx.append(len(retfilenames) - 1)
+            imgs.append(img)
+            residx.append(len(retfilenames) - 1)
 
     imgs = np.array(imgs)
     residx = np.array(residx)
