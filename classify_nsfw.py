@@ -30,7 +30,11 @@ def load_frames(pilimg, size):
 
 
 
-def eval_nsfw(model, filenames):
+def eval_nsfw(filenames):
+    model_def_filename = "open_nsfw_model/deploy.prototxt"
+    model_weights_filename = "open_nsfw_model/resnet_50_1by2_nsfw.caffemodel"
+    model = caffe.Net(model_def_filename, caffe.TEST, weights=model_weights_filename)
+
     transformer = caffe.io.Transformer({'data': model.blobs['data'].data.shape})
     transformer.set_transpose('data', (2, 0, 1))  # Channel first format
     transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
@@ -77,12 +81,7 @@ def eval_nsfw(model, filenames):
 
 def main():
     filenames = sys.argv[1:]
-    model_def_filename = "open_nsfw_model/deploy.prototxt"
-    model_weights_filename = "open_nsfw_model/resnet_50_1by2_nsfw.caffemodel"
-
-    nsfw_model = caffe.Net(model_def_filename, caffe.TEST, weights=model_weights_filename)
-
-    names, scores = eval_nsfw(nsfw_model, filenames)
+    names, scores = eval_nsfw(filenames)
     for f, s in zip(names, scores):
         print("%s: %f" % (f, s))
 
