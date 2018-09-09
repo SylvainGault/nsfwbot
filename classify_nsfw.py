@@ -2,11 +2,13 @@
 
 import sys
 import numpy as np
+import PIL.Image
 import caffe
 
 
 
 def eval_nsfw(model, transformer, filenames):
+    size = model.blobs['data'].data.shape[2:]
     imgs = []
     retfilenames = []
 
@@ -16,17 +18,18 @@ def eval_nsfw(model, transformer, filenames):
 
     for filename in filenames:
         try:
-            img = caffe.io.load_image(filename)
+            img = PIL.Image.open(filename)
         except:
             continue
 
         retfilenames.append(filename)
 
-        # Use one tenth of the frames for gifs
-        if img.ndim == 4:
-            newimgs = img[::10, :, :, :]
-        else:
-            newimgs = np.expand_dims(img, axis=0)
+        if img.mode != 'RGB':
+            img = img.convert("RGB")
+        img = img.resize(size, PIL.Image.BILINEAR)
+        img = np.array(img).astype(np.float32) / 255.0
+
+        newimgs = np.expand_dims(img, axis=0)
 
         for img in newimgs:
             try:
