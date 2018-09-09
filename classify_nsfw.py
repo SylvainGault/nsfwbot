@@ -7,6 +7,29 @@ import caffe
 
 
 
+def load_frames(pilimg, size):
+    retimgs = []
+    frameno = 0
+    while True:
+        try:
+            pilimg.seek(frameno)
+        except EOFError:
+            break
+
+        frame = pilimg
+        if frame.mode != 'RGB':
+            frame = frame.convert("RGB")
+
+        frame = frame.resize(size, PIL.Image.BILINEAR)
+        frame = np.array(frame).astype(np.float32) / 255.0
+
+        retimgs.append(frame)
+        frameno += 10
+
+    return np.array(retimgs)
+
+
+
 def eval_nsfw(model, transformer, filenames):
     size = model.blobs['data'].data.shape[2:]
     imgs = []
@@ -23,15 +46,9 @@ def eval_nsfw(model, transformer, filenames):
             continue
 
         retfilenames.append(filename)
+        frames = load_frames(img, size)
 
-        if img.mode != 'RGB':
-            img = img.convert("RGB")
-        img = img.resize(size, PIL.Image.BILINEAR)
-        img = np.array(img).astype(np.float32) / 255.0
-
-        newimgs = np.expand_dims(img, axis=0)
-
-        for img in newimgs:
+        for img in frames:
             try:
                 img = transformer.preprocess('data', img)
             except:
