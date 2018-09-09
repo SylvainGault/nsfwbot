@@ -30,7 +30,13 @@ def load_frames(pilimg, size):
 
 
 
-def eval_nsfw(model, transformer, filenames):
+def eval_nsfw(model, filenames):
+    transformer = caffe.io.Transformer({'data': model.blobs['data'].data.shape})
+    transformer.set_transpose('data', (2, 0, 1))  # Channel first format
+    transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
+    transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
+    transformer.set_mean('data', np.array([104, 117, 123]))  # subtract the dataset-mean value in each channel
+
     size = model.blobs['data'].data.shape[2:]
     imgs = []
     retfilenames = []
@@ -76,13 +82,7 @@ def main():
 
     nsfw_model = caffe.Net(model_def_filename, caffe.TEST, weights=model_weights_filename)
 
-    transformer = caffe.io.Transformer({'data': nsfw_model.blobs['data'].data.shape})
-    transformer.set_transpose('data', (2, 0, 1))  # Channel first format
-    transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
-    transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
-    transformer.set_mean('data', np.array([104, 117, 123]))  # subtract the dataset-mean value in each channel
-
-    names, scores = eval_nsfw(nsfw_model, transformer, filenames)
+    names, scores = eval_nsfw(nsfw_model, filenames)
     for f, s in zip(names, scores):
         print("%s: %f" % (f, s))
 
