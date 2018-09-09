@@ -9,11 +9,18 @@ import caffe
 def eval_nsfw(model, transformer, filenames):
     imgs = []
     retfilenames = []
+
+    # Each filename can result in several imgs. This array hold the
+    # retfilenames index for each entry in imgs.
+    residx = []
+
     for filename in filenames:
         try:
             img = caffe.io.load_image(filename)
         except:
             continue
+
+        retfilenames.append(filename)
 
         # Use only the first frame of a gif
         if img.ndim == 4:
@@ -24,15 +31,18 @@ def eval_nsfw(model, transformer, filenames):
         except:
             continue
 
-        retfilenames.append(filename)
         imgs.append(img)
+        residx.append(len(retfilenames) - 1)
 
     imgs = np.array(imgs)
+    residx = np.array(residx)
 
     output_name = next(reversed(model.blobs))
     input_name = model.inputs[0]
     all_outputs = model.forward_all(blobs=[output_name], **{input_name: imgs})
-    return retfilenames, all_outputs[output_name][:, 1]
+    all_outputs = all_outputs[output_name]
+    out = [all_outputs[residx == i, 1].max() for i in range(len(retfilenames))]
+    return retfilenames, np.array(out)
 
 
 
