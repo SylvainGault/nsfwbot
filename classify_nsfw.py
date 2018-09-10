@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import math
 import numpy as np
 import PIL.Image
 import caffe
@@ -8,6 +9,10 @@ import caffe
 
 
 def load_frames(pilimg, size):
+    maxunevenresize = 0.2
+    overlap = 0.5
+    nonoverlap = 1 - overlap
+
     retimgs = []
     frameno = 0
     while True:
@@ -20,10 +25,29 @@ def load_frames(pilimg, size):
         if frame.mode != 'RGB':
             frame = frame.convert("RGB")
 
-        frame = frame.resize(size, PIL.Image.BILINEAR)
+        fw, fh = frame.size
+        w, h = size
+        if 1 - maxunevenresize <= (fw * h) / (w * fh) <= 1 + maxunevenresize:
+            fh, fw = h, w
+        elif fw * h > w * fh:
+            fw = round(fw * h / fh)
+            fh = h
+        else:
+            fh = round(fh * w / fw)
+            fw = w
+
+        frame = frame.resize((fw, fh), PIL.Image.BILINEAR)
         frame = np.array(frame).astype(np.float32) / 255.0
 
-        retimgs.append(frame)
+        w, h = size
+        nh = math.ceil((fh - h * overlap) / (h * nonoverlap))
+        nw = math.ceil((fw - w * overlap) / (w * nonoverlap))
+
+        for hoff in np.linspace(0, fh - h, nh, dtype=np.int32):
+            for woff in np.linspace(0, fw - w, nw, dtype=np.int32):
+                tile = frame[hoff:hoff+h, woff:woff+w]
+                retimgs.append(tile)
+
         frameno += 10
 
     return np.array(retimgs)
