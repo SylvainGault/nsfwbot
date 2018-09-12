@@ -51,7 +51,12 @@ class ConnectionFactory(object):
 
 
 class NSFWBot(irc.bot.SingleServerIRCBot):
-    pass
+    def on_ready(self, cnx, event):
+        for c in channels:
+            cnx.join(c)
+
+    on_nomotd = on_ready
+    on_endofmotd = on_ready
 
 
 
