@@ -110,7 +110,11 @@ def main():
 
     specs = [irc.bot.ServerSpec(h, p) for h, p in it.product(hosts, ports)]
     bot = NSFWBot(specs, nicks[0], realname, reconnection_interval=10, connect_factory=ConnectionFactory())
-    bot.start()
+
+    try:
+        bot.start()
+    except KeyboardInterrupt:
+        bot.die()
 
 
 
