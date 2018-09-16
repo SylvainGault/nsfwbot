@@ -53,6 +53,7 @@ class ConnectionFactory(object):
 
 class NSFWBot(irc.bot.SingleServerIRCBot):
     nickre = re.compile(nicks[0] + r'(\d+)')
+    urlre = re.compile(r'https?://[^\s<>()]*')
 
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
@@ -101,6 +102,17 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_erroneusnickname(self, cnx, event):
         if not self.ready:
             self.choose_initial_nick(cnx, *event.arguments)
+
+    def on_pubmsg(self, cnx, event):
+        chan = event.target
+        if chan not in channels:
+            return
+
+        msg = event.arguments[0]
+        urls = self.urlre.findall(msg)
+
+        for url in urls:
+            logging.debug("Retrieving <%s>", url)
 
 
 
