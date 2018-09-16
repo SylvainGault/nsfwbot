@@ -75,6 +75,23 @@ class NSFWModel(object):
 
 
 
+    def eval(self, imgs):
+        """Evaluate the NSFW score on some preprocessed images."""
+
+        assert imgs.shape[0] == 0 or imgs.shape[1:] == self.model_inshape
+
+        inname = self.model_inname
+        outname = self.model_outname
+
+        outputs = self.model.forward_all(blobs=[outname], **{inname: imgs})
+        outputs = outputs[outname]
+
+        # Empty arrays are shaped (0,) instead of (0, 2).
+        outputs = outputs.reshape((-1, 2))
+        return outputs[:, 1]
+
+
+
     def eval_filenames(self, filenames):
         imgs = []
         retfilenames = []
@@ -104,11 +121,7 @@ class NSFWModel(object):
         imgs = np.array(imgs)
         residx = np.array(residx)
 
-        inname = self.model_inname
-        outname = self.model_outname
-
-        all_outputs = self.model.forward_all(blobs=[outname], **{inname: imgs})
-        all_outputs = all_outputs[outname]
-        out = [all_outputs[residx == i, 1].max() for i in range(len(retfilenames))]
+        all_outputs = self.eval(imgs)
+        out = [all_outputs[residx == i].max() for i in range(len(retfilenames))]
 
         return retfilenames, np.array(out)
