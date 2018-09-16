@@ -12,7 +12,13 @@ class NSFWModel(object):
     def __init__(self, deffile=model_def_filename, weightsfile=model_weights_filename):
         model = caffe.Net(deffile, caffe.TEST, weights=weightsfile)
 
-        transformer = caffe.io.Transformer({'data': model.blobs['data'].data.shape})
+        # Cache some meta-informations about the model
+        self.model_inshape = model.blobs['data'].data.shape[1:]
+        self.model_insize = self.model_inshape[1:]
+        self.model_inname = model.inputs[0]
+        self.model_outname = next(reversed(model.blobs))
+
+        transformer = caffe.io.Transformer({'data': model.blobs[self.model_inname].data.shape})
         transformer.set_transpose('data', (2, 0, 1))  # Channel first format
         transformer.set_channel_swap('data', (2, 1, 0))  # swap channels from RGB to BGR
         transformer.set_raw_scale('data', 255)  # rescale from [0, 1] to [0, 255]
@@ -23,7 +29,7 @@ class NSFWModel(object):
 
 
 
-    def _load_frames(self, pilimg, size):
+    def _load_frames(self, pilimg):
         maxunevenresize = 0.2
         overlap = 0.5
         nonoverlap = 1 - overlap
@@ -41,7 +47,7 @@ class NSFWModel(object):
                 frame = frame.convert("RGB")
 
             fw, fh = frame.size
-            w, h = size
+            w, h = self.model_insize
             if 1 - maxunevenresize <= (fw * h) / (w * fh) <= 1 + maxunevenresize:
                 fh, fw = h, w
             elif fw * h > w * fh:
@@ -54,7 +60,7 @@ class NSFWModel(object):
             frame = frame.resize((fw, fh), PIL.Image.BILINEAR)
             frame = np.array(frame).astype(np.float32) / 255.0
 
-            w, h = size
+            w, h = self.model_insize
             nh = math.ceil((fh - h * overlap) / (h * nonoverlap))
             nw = math.ceil((fw - w * overlap) / (w * nonoverlap))
 
@@ -70,7 +76,6 @@ class NSFWModel(object):
 
 
     def eval_filenames(self, filenames):
-        size = self.model.blobs['data'].data.shape[2:]
         imgs = []
         retfilenames = []
 
@@ -85,7 +90,7 @@ class NSFWModel(object):
                 continue
 
             retfilenames.append(filename)
-            frames = self._load_frames(img, size)
+            frames = self._load_frames(img)
 
             for img in frames:
                 try:
@@ -99,9 +104,11 @@ class NSFWModel(object):
         imgs = np.array(imgs)
         residx = np.array(residx)
 
-        output_name = next(reversed(self.model.blobs))
-        input_name = self.model.inputs[0]
-        all_outputs = self.model.forward_all(blobs=[output_name], **{input_name: imgs})
-        all_outputs = all_outputs[output_name]
+        inname = self.model_inname
+        outname = self.model_outname
+
+        all_outputs = self.model.forward_all(blobs=[outname], **{inname: imgs})
+        all_outputs = all_outputs[outname]
         out = [all_outputs[residx == i, 1].max() for i in range(len(retfilenames))]
+
         return retfilenames, np.array(out)
