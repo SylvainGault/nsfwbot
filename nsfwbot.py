@@ -9,6 +9,7 @@ import itertools as it
 import requests
 import irc.bot
 import irc.connection
+import libnsfw
 
 
 
@@ -60,6 +61,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
+        self._model = libnsfw.NSFWModel()
 
     def on_ready(self, cnx, event):
         self.ready = True
@@ -118,6 +120,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
             r = requests.get(url)
             f = io.BytesIO(r.content)
+            _, scores = self._model.eval_filenames([f])
+
+            if len(scores) == 0:
+                cnx.privmsg(chan, "<%s> Can't be read as an image" % url)
+                return
 
 
 
