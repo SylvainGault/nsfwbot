@@ -92,13 +92,40 @@ class NSFWModel(object):
 
 
 
+    def eval_pil(self, pilimgs):
+        """Evaluate the NSFW score on PIL-compatible image objects."""
+
+        imgs = []
+
+        # Each PIL image can result in several imgs. This array hold the
+        # index in pilimgs for each entry in imgs.
+        residx = []
+
+        for i, pilimg in enumerate(pilimgs):
+            frames = self._load_frames(pilimg)
+            for frame in frames:
+                try:
+                    frame = self.transformer.preprocess('data', frame)
+                except:
+                    continue
+
+                imgs.append(frame)
+                residx.append(i)
+
+        imgs = np.array(imgs)
+        residx = np.array(residx)
+
+        outputs = self.eval(imgs)
+        out = [outputs[residx == i].max() for i in range(len(pilimgs))]
+        return np.array(out)
+
+
+
     def eval_filenames(self, filenames):
+        """Evaluate the NSFW score on filenames."""
+
         imgs = []
         retfilenames = []
-
-        # Each filename can result in several imgs. This array hold the
-        # retfilenames index for each entry in imgs.
-        residx = []
 
         for filename in filenames:
             try:
@@ -106,22 +133,7 @@ class NSFWModel(object):
             except:
                 continue
 
+            imgs.append(img)
             retfilenames.append(filename)
-            frames = self._load_frames(img)
 
-            for img in frames:
-                try:
-                    img = self.transformer.preprocess('data', img)
-                except:
-                    continue
-
-                imgs.append(img)
-                residx.append(len(retfilenames) - 1)
-
-        imgs = np.array(imgs)
-        residx = np.array(residx)
-
-        all_outputs = self.eval(imgs)
-        out = [all_outputs[residx == i].max() for i in range(len(retfilenames))]
-
-        return retfilenames, np.array(out)
+        return retfilenames, self.eval_pil(imgs)
