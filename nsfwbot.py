@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import logging
+import io
 import re
 import socket
 import ssl
 import itertools as it
+import requests
 import irc.bot
 import irc.connection
 
@@ -113,6 +115,9 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
         for url in urls:
             logging.debug("Retrieving <%s>", url)
+
+            r = requests.get(url)
+            f = io.BytesIO(r.content)
 
 
 
