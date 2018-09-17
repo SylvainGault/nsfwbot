@@ -26,6 +26,8 @@ channels = ["#channel"]
 realname = "If you post NSFW images, I will tell!"
 # Logging level
 loglevel = logging.INFO
+# Max size of images to download
+max_download_size = 20 * 1024 * 1024
 ############################# End of configuration #############################
 
 
@@ -118,8 +120,16 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         for url in urls:
             logging.debug("Retrieving <%s>", url)
 
-            r = requests.get(url)
-            f = io.BytesIO(r.content)
+            with requests.get(url, stream=True) as r:
+                # Only read up to max_download_size bytes of image.
+                content = bytes()
+                for chunk in r.iter_content(chunk_size=1024):
+                    content += chunk
+                    if len(content) > max_download_size:
+                        content = content[:max_download_size]
+                        break
+
+            f = io.BytesIO(content)
             _, scores = self._model.eval_filenames([f])
 
             msg = "<%s> " % url
