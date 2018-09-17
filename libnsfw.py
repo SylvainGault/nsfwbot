@@ -41,6 +41,9 @@ class NSFWModel(object):
                 pilimg.seek(frameno)
             except EOFError:
                 break
+            except OSError:
+                # The image file might be truncated
+                break
 
             frame = pilimg
             if frame.mode != 'RGB':
@@ -57,7 +60,12 @@ class NSFWModel(object):
                 fh = round(fh * w / fw)
                 fw = w
 
-            frame = frame.resize((fw, fh), PIL.Image.BILINEAR)
+            try:
+                frame = frame.resize((fw, fh), PIL.Image.BILINEAR)
+            except OSError:
+                # The image file might be truncated
+                break
+
             frame = np.array(frame).astype(np.float32) / 255.0
 
             w, h = self.model_insize
@@ -93,8 +101,12 @@ class NSFWModel(object):
 
 
     def eval_pil(self, pilimgs):
-        """Evaluate the NSFW score on PIL-compatible image objects."""
+        """
+        Evaluate the NSFW score on PIL-compatible image objects.
+        Return the index of the pilimgs processed and their score.
+        """
 
+        retpilidx = []
         imgs = []
 
         # Each PIL image can result in several imgs. This array hold the
@@ -103,21 +115,21 @@ class NSFWModel(object):
 
         for i, pilimg in enumerate(pilimgs):
             frames = self._load_frames(pilimg)
-            for frame in frames:
-                try:
-                    frame = self.transformer.preprocess('data', frame)
-                except:
-                    continue
 
+            if len(frames) > 0:
+                retpilidx.append(i)
+
+            for frame in frames:
+                frame = self.transformer.preprocess('data', frame)
                 imgs.append(frame)
-                residx.append(i)
+                residx.append(len(retpilidx) - 1)
 
         imgs = np.array(imgs)
         residx = np.array(residx)
 
         outputs = self.eval(imgs)
-        out = [outputs[residx == i].max() for i in range(len(pilimgs))]
-        return np.array(out)
+        out = [outputs[residx == i].max() for i in range(len(retpilidx))]
+        return retpilidx, np.array(out)
 
 
 
@@ -136,4 +148,5 @@ class NSFWModel(object):
             imgs.append(img)
             retfilenames.append(filename)
 
-        return retfilenames, self.eval_pil(imgs)
+        pilsidx, scores = self.eval_pil(imgs)
+        return [retfilenames[i] for i in pilsidx], scores
