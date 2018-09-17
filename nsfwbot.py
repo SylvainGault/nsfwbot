@@ -122,21 +122,24 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             f = io.BytesIO(r.content)
             _, scores = self._model.eval_filenames([f])
 
+            msg = "<%s> " % url
+
             if len(scores) == 0:
-                cnx.privmsg(chan, "<%s> Can't be read as an image" % url)
-                return
-
-            score = scores[0] * 100
-            if score < 10:
-                msg = "Certainly safe"
-            elif 10 <= score < 50:
-                msg = "Probably safe"
-            elif 50 <= score < 90:
-                msg = "Probably sexy"
+                msg += "Can't read as an image."
             else:
-                msg = "Most likely porn"
+                score = scores[0] * 100
+                msg += "NSFW score: %.2f%%. " % score
 
-            cnx.privmsg(chan, "<%s> NSFW score: %.2f%%. %s." % (url, score, msg))
+                if score < 10:
+                    msg += "Certainly safe."
+                elif 10 <= score < 50:
+                    msg += "Probably safe."
+                elif 50 <= score < 90:
+                    msg += "Probably sexy."
+                else:
+                    msg += "Most likely porn."
+
+            cnx.privmsg(chan, msg)
 
 
 
