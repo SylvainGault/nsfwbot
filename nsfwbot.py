@@ -125,11 +125,13 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
                 totalsize = r.headers.get('Content-Length')
 
                 # Only read up to max_download_size bytes of image.
+                trunc = False
                 content = bytes()
                 for chunk in r.iter_content(chunk_size=1024):
                     content += chunk
                     if len(content) > max_download_size:
                         content = content[:max_download_size]
+                        trunc = True
                         break
 
             f = io.BytesIO(content)
@@ -153,6 +155,10 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
                     msg += "Probably sexy."
                 else:
                     msg += "Most likely porn."
+
+            if trunc:
+                mds = humanize.naturalsize(max_download_size, binary=True)
+                msg += " The %s download limit was reached." % mds
 
             cnx.privmsg(chan, msg)
 
