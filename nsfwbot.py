@@ -7,6 +7,7 @@ import socket
 import ssl
 import itertools as it
 import requests
+import humanize
 import irc.bot
 import irc.connection
 import libnsfw
@@ -121,6 +122,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             logging.debug("Retrieving <%s>", url)
 
             with requests.get(url, stream=True) as r:
+                totalsize = r.headers.get('Content-Length')
+
                 # Only read up to max_download_size bytes of image.
                 content = bytes()
                 for chunk in r.iter_content(chunk_size=1024):
@@ -133,6 +136,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             _, scores = self._model.eval_filenames([f])
 
             msg = "<%s> " % url
+            if totalsize:
+                msg += "(%s) " % humanize.naturalsize(totalsize, binary=True)
 
             if len(scores) == 0:
                 msg += "Can't read as an image."
