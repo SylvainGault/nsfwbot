@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 import logging
-import io
+import traceback as tb
 import re
 import socket
 import ssl
 import itertools as it
-import requests
+import functools
 import humanize
 import irc.bot
 import irc.connection
-import libnsfw
+import asyncworkflow
 
 
 
@@ -64,7 +64,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
-        self._model = libnsfw.NSFWModel()
+        self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
 
     def on_ready(self, cnx, event):
         self.ready = True
@@ -119,48 +119,43 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         urls = self.urlre.findall(msg)
 
         for url in urls:
-            logging.debug("Retrieving <%s>", url)
+            cb = functools.partial(self._scorecb, cnx, chan, url)
+            errcb = functools.partial(self._errcb, cnx, chan, url)
+            self._workflow.addurl(url, cb, errcb)
 
-            with requests.get(url, stream=True) as r:
-                totalsize = r.headers.get('Content-Length')
+    def _scorecb(self, cnx, chan, url, totalsize, istrunc, scores):
+        msg = "<%s> " % url
+        if totalsize:
+            msg += "(%s) " % humanize.naturalsize(totalsize, binary=True)
 
-                # Only read up to max_download_size bytes of image.
-                trunc = False
-                content = bytes()
-                for chunk in r.iter_content(chunk_size=1024):
-                    content += chunk
-                    if len(content) > max_download_size:
-                        content = content[:max_download_size]
-                        trunc = True
-                        break
+        if len(scores) == 0:
+            msg += "Can't read as an image."
+        else:
+            score = scores[0] * 100
+            msg += "NSFW score: %.2f%%. " % score
 
-            f = io.BytesIO(content)
-            _, scores = self._model.eval_filenames([f])
-
-            msg = "<%s> " % url
-            if totalsize:
-                msg += "(%s) " % humanize.naturalsize(totalsize, binary=True)
-
-            if len(scores) == 0:
-                msg += "Can't read as an image."
+            if score < 10:
+                msg += "Certainly safe."
+            elif 10 <= score < 50:
+                msg += "Probably safe."
+            elif 50 <= score < 90:
+                msg += "Probably sexy."
             else:
-                score = scores[0] * 100
-                msg += "NSFW score: %.2f%%. " % score
+                msg += "Most likely porn."
 
-                if score < 10:
-                    msg += "Certainly safe."
-                elif 10 <= score < 50:
-                    msg += "Probably safe."
-                elif 50 <= score < 90:
-                    msg += "Probably sexy."
-                else:
-                    msg += "Most likely porn."
+        if istrunc:
+            mds = humanize.naturalsize(max_download_size, binary=True)
+            msg += " The %s download limit was reached." % mds
 
-            if trunc:
-                mds = humanize.naturalsize(max_download_size, binary=True)
-                msg += " The %s download limit was reached." % mds
+        cnx.privmsg(chan, msg)
 
-            cnx.privmsg(chan, msg)
+    def _errcb(self, cnx, chan, url, exc):
+        cnx.privmsg(chan, "Error while processing <%s>" % url)
+
+        lines = tb.format_exception_only(type(exc), exc)
+        for l in lines:
+            logging.info(l)
+            cnx.privmsg(chan, l.rstrip())
 
 
 
