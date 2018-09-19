@@ -94,7 +94,7 @@ class NSFWModel(object):
 
         # Each PIL image can result in several imgs. This array hold the
         # index in pilimgs for each entry in imgs.
-        residx = []
+        pilidx = []
         imgs = []
 
         for i, pilimg in enumerate(pilimgs):
@@ -103,11 +103,38 @@ class NSFWModel(object):
             for frame in frames:
                 frame = self.transformer.preprocess('data', frame)
                 imgs.append(frame)
-                residx.append(i)
+                pilidx.append(i)
 
         imgs = np.array(imgs)
-        residx = np.array(residx)
-        return residx, imgs
+        pilidx = np.array(pilidx, dtype=np.int)
+        return pilidx, imgs
+
+
+
+    def preprocess_files(self, files):
+        """
+        Preprocess file-like objects. Each file can result in several returned
+        frames.
+        Return the index array of the files preprocessed and a numpy array of
+        the images. The index array stores the index of the PIL image that
+        generated the frame.
+        """
+
+        imgs = []
+        filesidx = []
+
+        for i, f in enumerate(files):
+            try:
+                img = PIL.Image.open(f)
+            except:
+                continue
+
+            imgs.append(img)
+            filesidx.append(i)
+
+        filesidx = np.array(filesidx)
+        imgidx, frames = self.preprocess_pil(imgs)
+        return filesidx[imgidx], frames
 
 
 
@@ -146,17 +173,9 @@ class NSFWModel(object):
     def eval_files(self, files):
         """Evaluate the NSFW score on filenames or file-like objects."""
 
-        imgs = []
-        retfiles = []
+        filesidx, frames = self.preprocess_files(files)
+        uniqidx = sorted(set(filesidx))
 
-        for f in files:
-            try:
-                img = PIL.Image.open(f)
-            except:
-                continue
-
-            imgs.append(img)
-            retfiles.append(f)
-
-        pilsidx, scores = self.eval_pil(imgs)
-        return [retfiles[i] for i in pilsidx], scores
+        scoresframes = self.eval(frames)
+        out = [scoresframes[filesidx == i].max() for i in uniqidx]
+        return [files[i] for i in uniqidx], np.array(out)
