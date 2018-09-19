@@ -8,11 +8,11 @@ import libnsfw
 def main():
     filenames = sys.argv[1:]
     model = libnsfw.NSFWModel()
-    names, scores = model.eval_files(filenames)
-    for f, s in zip(names, scores):
-        print("%s: %f" % (f, s))
+    idx, scores = model.eval_files(filenames)
+    for i, s in zip(idx, scores):
+        print("%s: %f" % (filenames[i], s))
 
-    if len(names) > 0:
+    if len(idx) > 0:
         print("Average:", scores.mean())
 
 

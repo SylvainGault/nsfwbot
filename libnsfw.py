@@ -178,4 +178,4 @@ class NSFWModel(object):
 
         scoresframes = self.eval(frames)
         out = [scoresframes[filesidx == i].max() for i in uniqidx]
-        return [files[i] for i in uniqidx], np.array(out)
+        return np.array(uniqidx), np.array(out)
