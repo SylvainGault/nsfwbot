@@ -71,7 +71,10 @@ class AsyncWorkflow(object):
 
             cb, totalsize, trunc, f = task
             _, scores = self._model.eval_files([f])
-            cb(totalsize, trunc, scores)
+
+            score = scores[0] if len(scores) > 0 else None
+            cb(totalsize, trunc, score)
+
             self._filesq.task_done()
 
         logging.debug("Evaluation thread quits")

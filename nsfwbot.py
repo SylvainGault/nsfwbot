@@ -139,15 +139,15 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
             self._workflow.addurl(url, cb, errcb)
 
-    def _scorecb(self, cnx, chan, url, totalsize, istrunc, scores):
+    def _scorecb(self, cnx, chan, url, totalsize, istrunc, score):
         msg = "<%s> " % url
         if totalsize:
             msg += "(%s) " % humanize.naturalsize(totalsize, binary=True)
 
-        if len(scores) == 0:
+        if score is None:
             msg += "Can't read as an image."
         else:
-            score = scores[0] * 100
+            score *= 100
             msg += "NSFW score: %.2f%%. " % score
 
             if score < 10:
