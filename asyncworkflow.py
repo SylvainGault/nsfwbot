@@ -1,6 +1,8 @@
 import logging
 import io
 import multiprocessing.pool as pool
+import threading
+import queue
 import requests
 import libnsfw
 
@@ -16,25 +18,32 @@ class AsyncWorkflow(object):
         self._model = libnsfw.NSFWModel()
         self._maxdlsize = maxdlsize
         self._dlpool = pool.ThreadPool(maxdownloads)
+        self._evalth = threading.Thread(target=self._evalimg)
+        self._filesq = queue.Queue(10)
+
+        self._evalth.start()
 
 
 
     def addurl(self, url, callback=None, error_callback=None):
-        def cb(res):
-            if callback:
-                callback(*res)
-
         def errcb(exc):
             if error_callback:
                 error_callback(exc)
             else:
                 raise exc
 
-        self._dlpool.apply_async(self._dlimage, (url,), callback=cb, error_callback=errcb)
+        args = (url, callback)
+        self._dlpool.apply_async(self._dlimage, args, error_callback=errcb)
 
 
 
-    def _dlimage(self, url):
+    def stop(self):
+        self._filesq.put(None)
+        self._filesq.join()
+
+
+
+    def _dlimage(self, url, cb):
         with requests.get(url, stream=True) as r:
             totalsize = r.headers.get('Content-Length')
 
@@ -49,5 +58,20 @@ class AsyncWorkflow(object):
                     break
 
         f = io.BytesIO(content)
-        _, scores = self._model.eval_files([f])
-        return totalsize, trunc, scores
+        self._filesq.put((cb, totalsize, trunc, f))
+
+
+
+    def _evalimg(self):
+        while True:
+            task = self._filesq.get()
+            if task is None:
+                self._filesq.task_done()
+                break
+
+            cb, totalsize, trunc, f = task
+            _, scores = self._model.eval_files([f])
+            cb(totalsize, trunc, scores)
+            self._filesq.task_done()
+
+        logging.debug("Evaluation thread quits")

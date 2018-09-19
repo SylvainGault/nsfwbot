@@ -173,6 +173,10 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             logging.info(l)
             cnx.privmsg(chan, l.rstrip())
 
+    def die(self):
+        self._workflow.stop()
+        super(NSFWBot, self).die()
+
 
 
 def main():
