@@ -133,20 +133,20 @@ class NSFWModel(object):
 
 
 
-    def eval_filenames(self, filenames):
-        """Evaluate the NSFW score on filenames."""
+    def eval_files(self, files):
+        """Evaluate the NSFW score on filenames or file-like objects."""
 
         imgs = []
-        retfilenames = []
+        retfiles = []
 
-        for filename in filenames:
+        for f in files:
             try:
-                img = PIL.Image.open(filename)
+                img = PIL.Image.open(f)
             except:
                 continue
 
             imgs.append(img)
-            retfilenames.append(filename)
+            retfiles.append(f)
 
         pilsidx, scores = self.eval_pil(imgs)
-        return [retfilenames[i] for i in pilsidx], scores
+        return [retfiles[i] for i in pilsidx], scores

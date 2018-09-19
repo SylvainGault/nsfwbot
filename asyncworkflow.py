@@ -49,5 +49,5 @@ class AsyncWorkflow(object):
                     break
 
         f = io.BytesIO(content)
-        _, scores = self._model.eval_filenames([f])
+        _, scores = self._model.eval_files([f])
         return totalsize, trunc, scores

@@ -8,7 +8,7 @@ import libnsfw
 def main():
     filenames = sys.argv[1:]
     model = libnsfw.NSFWModel()
-    names, scores = model.eval_filenames(filenames)
+    names, scores = model.eval_files(filenames)
     for f, s in zip(names, scores):
         print("%s: %f" % (f, s))
 
