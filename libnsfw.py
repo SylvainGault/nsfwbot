@@ -83,6 +83,34 @@ class NSFWModel(object):
 
 
 
+    def preprocess_pil(self, pilimgs):
+        """
+        Preprocess PIL-compatible image objects. Each PIL image can result in
+        several returned frames.
+        Return the index array of the pilimgs preprocessed and a numpy array of
+        frames. The index array stores the index of the PIL image that
+        generated the frame.
+        """
+
+        # Each PIL image can result in several imgs. This array hold the
+        # index in pilimgs for each entry in imgs.
+        residx = []
+        imgs = []
+
+        for i, pilimg in enumerate(pilimgs):
+            frames = self._load_frames(pilimg)
+
+            for frame in frames:
+                frame = self.transformer.preprocess('data', frame)
+                imgs.append(frame)
+                residx.append(i)
+
+        imgs = np.array(imgs)
+        residx = np.array(residx)
+        return residx, imgs
+
+
+
     def eval(self, imgs):
         """Evaluate the NSFW score on some preprocessed images."""
 
@@ -106,30 +134,12 @@ class NSFWModel(object):
         Return the index of the pilimgs processed and their score.
         """
 
-        retpilidx = []
-        imgs = []
+        pilidx, frames = self.preprocess_pil(pilimgs)
+        uniqidx = sorted(set(pilidx))
 
-        # Each PIL image can result in several imgs. This array hold the
-        # index in pilimgs for each entry in imgs.
-        residx = []
-
-        for i, pilimg in enumerate(pilimgs):
-            frames = self._load_frames(pilimg)
-
-            if len(frames) > 0:
-                retpilidx.append(i)
-
-            for frame in frames:
-                frame = self.transformer.preprocess('data', frame)
-                imgs.append(frame)
-                residx.append(len(retpilidx) - 1)
-
-        imgs = np.array(imgs)
-        residx = np.array(residx)
-
-        outputs = self.eval(imgs)
-        out = [outputs[residx == i].max() for i in range(len(retpilidx))]
-        return retpilidx, np.array(out)
+        scoresframes = self.eval(frames)
+        out = [scoresframes[pilidx == i].max() for i in uniqidx]
+        return np.array(uniqidx), np.array(out)
 
 
 
