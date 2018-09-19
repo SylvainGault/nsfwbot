@@ -4,6 +4,7 @@ import multiprocessing.pool as pool
 import threading
 import queue
 import requests
+import numpy as np
 import libnsfw
 
 
@@ -85,19 +86,49 @@ class AsyncWorkflow(object):
 
 
     def _evalframes(self):
-        while True:
-            task = self._framesq.get()
+        stop = False
 
+        while not stop:
+            # Wait for at least one task
+            task = self._framesq.get()
             if task is None:
                 self._framesq.task_done()
                 break
 
-            cb, totalsize, trunc, frames = task
+            tasks = [task]
+
+            # Process all the pending tasks at once
+            while True:
+                try:
+                    task = self._framesq.get_nowait()
+                except queue.Empty:
+                    break
+
+                if task is None:
+                    stop = True
+                    self._framesq.task_done()
+                    break
+
+                tasks.append(task)
+
+
+            # Concatenate all the frames to process them in a single batch
+            taskidx = []
+            frames_list = []
+            for i, task in enumerate(tasks):
+                cb, totalsize, trunc, frames = task
+                frames_list.append(frames)
+                taskidx += [i] * frames.shape[0]
+
+            frames = np.concatenate(frames_list, axis=0)
             scores = self._model.eval(frames)
 
-            score = scores.max() if scores.shape[0] > 0 else None
-            cb(totalsize, trunc, score)
+            # Call all the callbacks
+            taskidx = np.array(taskidx)
+            for i, (cb, totalsize, trunc, _) in enumerate(tasks):
+                score = scores[taskidx == i].max()
+                cb(totalsize, trunc, score)
+                self._framesq.task_done()
 
-            self._framesq.task_done()
 
         logging.debug("Evaluation thread quits")
