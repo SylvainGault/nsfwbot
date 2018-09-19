@@ -18,9 +18,12 @@ class AsyncWorkflow(object):
         self._model = libnsfw.NSFWModel()
         self._maxdlsize = maxdlsize
         self._dlpool = pool.ThreadPool(maxdownloads)
-        self._evalth = threading.Thread(target=self._evalimg)
+        self._ppth = threading.Thread(target=self._preprocess)
+        self._evalth = threading.Thread(target=self._evalframes)
         self._filesq = queue.Queue(10)
+        self._framesq = queue.Queue(20)
 
+        self._ppth.start()
         self._evalth.start()
 
 
@@ -62,19 +65,39 @@ class AsyncWorkflow(object):
 
 
 
-    def _evalimg(self):
+    def _preprocess(self):
         while True:
             task = self._filesq.get()
+
             if task is None:
+                self._framesq.put(None)
+                self._framesq.join()
                 self._filesq.task_done()
                 break
 
             cb, totalsize, trunc, f = task
-            _, scores = self._model.eval_files([f])
+            _, frames = self._model.preprocess_files([f])
+            self._framesq.put((cb, totalsize, trunc, frames))
+            self._filesq.task_done()
 
-            score = scores[0] if len(scores) > 0 else None
+        logging.debug("Preprocessing thread quits")
+
+
+
+    def _evalframes(self):
+        while True:
+            task = self._framesq.get()
+
+            if task is None:
+                self._framesq.task_done()
+                break
+
+            cb, totalsize, trunc, frames = task
+            scores = self._model.eval(frames)
+
+            score = scores.max() if scores.shape[0] > 0 else None
             cb(totalsize, trunc, score)
 
-            self._filesq.task_done()
+            self._framesq.task_done()
 
         logging.debug("Evaluation thread quits")
