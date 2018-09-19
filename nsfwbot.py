@@ -2,11 +2,11 @@
 
 import logging
 import traceback as tb
+import queue
 import re
 import socket
 import ssl
 import itertools as it
-import functools
 import humanize
 import irc.bot
 import irc.connection
@@ -65,6 +65,17 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
+        self._ircloopq = queue.Queue()
+        self.ircobj.execute_every(0.2, self._runqueue)
+
+    def _runqueue(self):
+        while True:
+            try:
+                fun, args = self._ircloopq.get_nowait()
+            except queue.Empty:
+                break
+
+            fun(*args)
 
     def on_ready(self, cnx, event):
         self.ready = True
@@ -119,8 +130,13 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         urls = self.urlre.findall(msg)
 
         for url in urls:
-            cb = functools.partial(self._scorecb, cnx, chan, url)
-            errcb = functools.partial(self._errcb, cnx, chan, url)
+            def cb(*args):
+                logging.debug("Scheduling _scorecb with arguments %s", args)
+                self._ircloopq.put((self._scorecb, (cnx, chan, url, *args)))
+            def errcb(*args):
+                logging.debug("Scheduling _errcb with arguments %s", args)
+                self._ircloopq.put((self._errcb, (cnx, chan, url, *args)))
+
             self._workflow.addurl(url, cb, errcb)
 
     def _scorecb(self, cnx, chan, url, totalsize, istrunc, scores):
