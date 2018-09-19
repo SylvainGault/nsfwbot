@@ -2,7 +2,7 @@
 
 import logging
 import traceback as tb
-import queue
+import asyncio
 import re
 import socket
 import ssl
@@ -65,17 +65,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
-        self._ircloopq = queue.Queue()
-        self.ircobj.execute_every(0.2, self._runqueue)
-
-    def _runqueue(self):
-        while True:
-            try:
-                fun, args = self._ircloopq.get_nowait()
-            except queue.Empty:
-                break
-
-            fun(*args)
+        self._loop = asyncio.get_event_loop()
 
     def on_ready(self, cnx, event):
         self.ready = True
@@ -132,10 +122,10 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         for url in urls:
             def cb(*args):
                 logging.debug("Scheduling _scorecb with arguments %s", args)
-                self._ircloopq.put((self._scorecb, (cnx, chan, url, *args)))
+                self._loop.call_soon_threadsafe(self._scorecb, cnx, chan, url, *args)
             def errcb(*args):
                 logging.debug("Scheduling _errcb with arguments %s", args)
-                self._ircloopq.put((self._errcb, (cnx, chan, url, *args)))
+                self._loop.call_soon_threadsafe(self._errcb, cnx, chan, url, *args)
 
             self._workflow.addurl(url, cb, errcb)
 
@@ -172,6 +162,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         for l in lines:
             logging.info(l)
             cnx.privmsg(chan, l.rstrip())
+
+    def start(self):
+        self._connect()
+        self._loop.add_reader(self.connection.socket, self.connection.process_data)
+        self._loop.run_forever()
 
     def die(self):
         self._workflow.stop()
