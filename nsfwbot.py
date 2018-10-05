@@ -9,6 +9,7 @@ import ssl
 import itertools as it
 import humanize
 import irc.bot
+import irc.dict
 import irc.connection
 import asyncworkflow
 
@@ -64,8 +65,25 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
+        self._socket = None
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
         self._loop = asyncio.get_event_loop()
+
+    # Override SingleServerIRCBot._connect
+    def _connect(self):
+        super(NSFWBot, self)._connect()
+        if self.connection.is_connected():
+            self._socket = self.connection.socket
+            self._loop.add_reader(self._socket, self.connection.process_data)
+        else:
+            self._loop.call_later(self.reconnection_interval, self.jump_server)
+
+    # Override SingleServerIRCBot._on_disconnect
+    def _on_disconnect(self, c, e):
+        self._loop.remove_reader(self._socket)
+        self._socket = None
+        self.channels = irc.dict.IRCDict()
+        self._loop.call_later(self.reconnection_interval, self.jump_server)
 
     def on_ready(self, cnx, event):
         self.ready = True
@@ -165,7 +183,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
     def start(self):
         self._connect()
-        self._loop.add_reader(self.connection.socket, self.connection.process_data)
+        self._loop.call_later(self.reconnection_interval, self._connected_checker)
         self._loop.run_forever()
 
     def die(self):
