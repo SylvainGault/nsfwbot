@@ -186,6 +186,9 @@ def main():
     logfmt = "%(asctime)s %(levelname)s: %(message)s"
     logging.basicConfig(format=logfmt, level=loglevel)
 
+    # A bit of magic to make the decoding work better
+    irc.client.ServerConnection.buffer_class.errors = 'replace'
+
     specs = [irc.bot.ServerSpec(h, p) for h, p in it.product(hosts, ports)]
     bot = NSFWBot(specs, nicks[0], realname, reconnection_interval=10, connect_factory=ConnectionFactory())
 
