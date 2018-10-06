@@ -25,6 +25,8 @@ nicks = ["nsfwbot"]
 channels = ["#channel"]
 # Real name
 realname = "If you post NSFW images, I will tell!"
+# NickServ password
+nspass = None
 # Logging level
 loglevel = logging.INFO
 # Max size of images to download
@@ -127,6 +129,15 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_erroneusnickname(self, cnx, event):
         if not self.ready:
             self.choose_initial_nick(cnx, *event.arguments)
+
+    def on_privnotice(self, cnx, event):
+        nickmask = irc.client.NickMask(event.source)
+        if not irc.strings.IRCFoldedCase(nickmask.nick) == "nickserv":
+            return
+
+        msg = event.arguments[0]
+        if msg.startswith("Ce pseudo est enregistr� et prot�g�"):
+            cnx.privmsg("nickserv", "IDENTIFY %s" % nspass)
 
     def on_pubmsg(self, cnx, event):
         chan = event.target
