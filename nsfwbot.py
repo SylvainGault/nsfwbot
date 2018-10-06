@@ -90,6 +90,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_ready(self, cnx, event):
         self.ready = True
 
+        if cnx.get_nickname() != nicks[0]:
+            cnx.privmsg("nickserv", "RELEASE %s %s" % (nicks[0], nspass))
+            cnx.privmsg("nickserv", "GHOST %s %s" % (nicks[0], nspass))
+
+
     on_nomotd = on_ready
     on_endofmotd = on_ready
 
@@ -146,6 +151,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             cnx.privmsg("nickserv", "IDENTIFY %s" % nspass)
         elif msg == "Mot de passe accept� - vous �tes maintenant identifi�.":
             self.on_identified(cnx, event)
+        elif msg == "L'utilisateur fant�me utilisant votre pseudo a �t� d�connect�.":
+            cnx.nick(nicks[0])
 
     def on_pubmsg(self, cnx, event):
         chan = event.target
