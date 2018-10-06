@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import traceback as tb
 import asyncio
 import re
 import socket
@@ -138,16 +137,16 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         urls = self.urlre.findall(msg)
 
         for url in urls:
-            def cb(*args):
-                logging.debug("Scheduling _scorecb with arguments %s", args)
-                self._loop.call_soon_threadsafe(self._scorecb, cnx, chan, url, *args)
-            def errcb(*args):
-                logging.debug("Scheduling _errcb with arguments %s", args)
-                self._loop.call_soon_threadsafe(self._errcb, cnx, chan, url, *args)
+            asyncio.ensure_future(self._nsfw_report(cnx, chan, url))
 
-            self._workflow.addurl(url, cb, errcb)
+    async def _nsfw_report(self, cnx, chan, url):
+        try:
+            totalsize, istrunc, score = await self._workflow.score_url(url)
+        except Exception as e:
+            logging.exception(e)
+            cnx.privmsg(chan, "<%s>: %s" % (url, e))
+            return
 
-    def _scorecb(self, cnx, chan, url, totalsize, istrunc, score):
         msg = "<%s> " % url
         if totalsize:
             msg += "(%s) " % humanize.naturalsize(totalsize, binary=True)
@@ -173,21 +172,12 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
         cnx.privmsg(chan, msg)
 
-    def _errcb(self, cnx, chan, url, exc):
-        cnx.privmsg(chan, "Error while processing <%s>" % url)
-
-        lines = tb.format_exception_only(type(exc), exc)
-        for l in lines:
-            logging.info(l)
-            cnx.privmsg(chan, l.rstrip())
-
     def start(self):
         self._connect()
         self._loop.call_later(self.reconnection_interval, self._connected_checker)
         self._loop.run_forever()
 
     def die(self):
-        self._workflow.stop()
         super(NSFWBot, self).die()
 
 
