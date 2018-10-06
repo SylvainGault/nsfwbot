@@ -70,6 +70,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         self._socket = None
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
         self._loop = asyncio.get_event_loop()
+        self._ident_timeout_handler = None
 
     # Override SingleServerIRCBot._connect
     def _connect(self):
@@ -90,6 +91,9 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_ready(self, cnx, event):
         self.ready = True
 
+        handler = self._loop.call_later(10, self.on_identification_timeout, cnx)
+        self._ident_timeout_handler = handler
+
         if cnx.get_nickname() != nicks[0]:
             cnx.privmsg("nickserv", "RELEASE %s %s" % (nicks[0], nspass))
             cnx.privmsg("nickserv", "GHOST %s %s" % (nicks[0], nspass))
@@ -99,10 +103,19 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     on_endofmotd = on_ready
 
     def on_identified(self, cnx, event):
+        if self._ident_timeout_handler:
+            self._ident_timeout_handler.cancel()
+            self._ident_timeout_handler = None
+
         self.identified = True
 
         for c in channels:
             cnx.join(c)
+
+    def on_identification_timeout(self, cnx):
+        for c in channels:
+            cnx.join(c)
+            cnx.privmsg(c, "I couldn't identify to nickserv. Please help. :(")
 
     def on_disconnect(self, cnx, event):
         self.ready = False
