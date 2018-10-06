@@ -31,6 +31,9 @@ nspass = None
 loglevel = logging.INFO
 # Max size of images to download
 max_download_size = 20 * 1024 * 1024
+
+# NickServ nickname
+ns_nick = "NickServ"
 ############################# End of configuration #############################
 
 
@@ -100,8 +103,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         self._ident_timeout_handler = handler
 
         if cnx.get_nickname() != nicks[0]:
-            cnx.privmsg("nickserv", "RELEASE %s %s" % (nicks[0], nspass))
-            cnx.privmsg("nickserv", "GHOST %s %s" % (nicks[0], nspass))
+            cnx.privmsg(ns_nick, "RELEASE %s %s" % (nicks[0], nspass))
+            cnx.privmsg(ns_nick, "GHOST %s %s" % (nicks[0], nspass))
 
 
     on_nomotd = on_fully_connected
@@ -122,7 +125,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_identification_timeout(self, cnx):
         for c in channels:
             cnx.join(c)
-            cnx.privmsg(c, "I couldn't identify to nickserv. Please help. :(")
+            cnx.privmsg(c, "I couldn't identify to %s. Please help. :(" % ns_nick)
 
     def on_disconnect(self, cnx, event):
         self.fully_connected = False
@@ -163,12 +166,12 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
     def on_privnotice(self, cnx, event):
         nickmask = irc.client.NickMask(event.source)
-        if not irc.strings.IRCFoldedCase(nickmask.nick) == "nickserv":
+        if not irc.strings.IRCFoldedCase(nickmask.nick) == ns_nick:
             return
 
         msg = event.arguments[0]
         if msg.startswith("Ce pseudo est enregistr� et prot�g�"):
-            cnx.privmsg("nickserv", "IDENTIFY %s" % nspass)
+            cnx.privmsg(ns_nick, "IDENTIFY %s" % nspass)
         elif msg == "Mot de passe accept� - vous �tes maintenant identifi�.":
             self.on_identified(cnx, event)
         elif msg == "L'utilisateur fant�me utilisant votre pseudo a �t� d�connect�.":
