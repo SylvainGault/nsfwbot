@@ -65,7 +65,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
-        self.ready = False
+        self.fully_connected = False
         self.identified = False
         self._socket = None
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
@@ -88,8 +88,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         self.channels = irc.dict.IRCDict()
         self._loop.call_later(self.reconnection_interval, self.jump_server)
 
-    def on_ready(self, cnx, event):
-        self.ready = True
+    def on_fully_connected(self, cnx, event):
+        self.fully_connected = True
 
         handler = self._loop.call_later(10, self.on_identification_timeout, cnx)
         self._ident_timeout_handler = handler
@@ -99,8 +99,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             cnx.privmsg("nickserv", "GHOST %s %s" % (nicks[0], nspass))
 
 
-    on_nomotd = on_ready
-    on_endofmotd = on_ready
+    on_nomotd = on_fully_connected
+    on_endofmotd = on_fully_connected
 
     def on_identified(self, cnx, event):
         if self._ident_timeout_handler:
@@ -118,7 +118,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             cnx.privmsg(c, "I couldn't identify to nickserv. Please help. :(")
 
     def on_disconnect(self, cnx, event):
-        self.ready = False
+        self.fully_connected = False
         self.identified = False
 
     def choose_initial_nick(self, cnx, nick, msg):
@@ -147,11 +147,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         cnx.nick(newnick)
 
     def on_nicknameinuse(self, cnx, event):
-        if not self.ready:
+        if not self.fully_connected:
             self.choose_initial_nick(cnx, *event.arguments)
 
     def on_erroneusnickname(self, cnx, event):
-        if not self.ready:
+        if not self.fully_connected:
             self.choose_initial_nick(cnx, *event.arguments)
 
     def on_privnotice(self, cnx, event):
