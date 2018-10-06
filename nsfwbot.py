@@ -91,6 +91,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def on_fully_connected(self, cnx, event):
         self.fully_connected = True
 
+        # Bypass identification if there is no password
+        if nspass is None or len(nspass) == 0:
+            self.on_ready(cnx, event)
+            return
+
         handler = self._loop.call_later(10, self.on_identification_timeout, cnx)
         self._ident_timeout_handler = handler
 
@@ -108,7 +113,9 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             self._ident_timeout_handler = None
 
         self.identified = True
+        self.on_ready(cnx, event)
 
+    def on_ready(self, cnx, event):
         for c in channels:
             cnx.join(c)
 
