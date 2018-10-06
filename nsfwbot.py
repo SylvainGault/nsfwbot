@@ -66,6 +66,7 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
     def __init__(self, *args, **kwargs):
         super(NSFWBot, self).__init__(*args, **kwargs)
         self.ready = False
+        self.identified = False
         self._socket = None
         self._workflow = asyncworkflow.AsyncWorkflow(maxdlsize=max_download_size)
         self._loop = asyncio.get_event_loop()
@@ -88,14 +89,19 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
 
     def on_ready(self, cnx, event):
         self.ready = True
-        for c in channels:
-            cnx.join(c)
 
     on_nomotd = on_ready
     on_endofmotd = on_ready
 
+    def on_identified(self, cnx, event):
+        self.identified = True
+
+        for c in channels:
+            cnx.join(c)
+
     def on_disconnect(self, cnx, event):
         self.ready = False
+        self.identified = False
 
     def choose_initial_nick(self, cnx, nick, msg):
         # nick is the last one we tried. So try the next one in the list
@@ -138,6 +144,8 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
         msg = event.arguments[0]
         if msg.startswith("Ce pseudo est enregistr� et prot�g�"):
             cnx.privmsg("nickserv", "IDENTIFY %s" % nspass)
+        elif msg == "Mot de passe accept� - vous �tes maintenant identifi�.":
+            self.on_identified(cnx, event)
 
     def on_pubmsg(self, cnx, event):
         chan = event.target
