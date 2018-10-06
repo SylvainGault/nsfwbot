@@ -34,6 +34,11 @@ max_download_size = 20 * 1024 * 1024
 
 # NickServ nickname
 ns_nick = "NickServ"
+# NickServ message
+nsmsgre = {}
+nsmsgre["nick_is_registered"] = r"Ce pseudo est enregistr� et prot�g�.*"
+nsmsgre["accepted_password"] = r"Mot de passe accept�.*"
+nsmsgre["ghosted"] = r"L'utilisateur .* a �t� d�connect�."
 ############################# End of configuration #############################
 
 
@@ -170,11 +175,11 @@ class NSFWBot(irc.bot.SingleServerIRCBot):
             return
 
         msg = event.arguments[0]
-        if msg.startswith("Ce pseudo est enregistr� et prot�g�"):
+        if re.match(nsmsgre["nick_is_registered"], msg):
             cnx.privmsg(ns_nick, "IDENTIFY %s" % nspass)
-        elif msg == "Mot de passe accept� - vous �tes maintenant identifi�.":
+        elif re.match(nsmsgre["accepted_password"], msg):
             self.on_identified(cnx, event)
-        elif msg == "L'utilisateur fant�me utilisant votre pseudo a �t� d�connect�.":
+        elif re.match(nsmsgre["ghosted"], msg):
             cnx.nick(nicks[0])
 
     def on_pubmsg(self, cnx, event):
